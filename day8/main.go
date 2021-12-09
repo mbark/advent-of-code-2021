@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mbark/advent-of-code-2021/functools"
 	"github.com/mbark/advent-of-code-2021/util"
 	"sort"
 	"strconv"
@@ -360,23 +361,17 @@ func both(signals []string, output []string) (int, int) {
 				continue
 			}
 
-			isMatch := true
-			for _, s := range o {
+			isMatch := functools.Every(o, func(i int) bool {
 				var is rune
-				for r := range mapping[s] {
+				for r := range mapping[rune(o[i])] {
 					is = r
 				}
 
-				var contains bool
-				for _, d := range digits {
-					if is == d {
-						contains = true
-						break
-					}
-				}
+				return functools.Some(digits, func(i int) bool {
+					return is == digits[i]
+				})
+			})
 
-				isMatch = isMatch && contains
-			}
 			if isMatch {
 				number = n
 				break
@@ -408,19 +403,15 @@ func constructMapping(signals []string, visited map[string]bool, mapping Mapping
 				continue
 			}
 
-			isPossible := true
-			for _, d := range digits {
-				isInOne := false
-				for _, s := range signal {
-					possible := mapping[s]
+			isPossible := functools.Every(digits, func(i int) bool {
+				d := digits[i]
+				return functools.Some(signal, func(i int) bool {
+					possible := mapping[rune(signal[i])]
 					_, ok := possible[d]
-					if ok {
-						isInOne = true
-						break
-					}
-				}
-				isPossible = isPossible && isInOne
-			}
+					return ok
+				})
+			})
+
 			if isPossible {
 				matches = append(matches, i)
 			}
