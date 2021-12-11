@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/maps"
-	"github.com/mbark/advent-of-code-2021/util"
 )
 
 var testData = `
@@ -41,30 +40,25 @@ var in = `
 `
 
 func main() {
-	m := make(map[maps.Coordinate]int)
-	for y, l := range util.ReadInput(in, "\n") {
-		for x, n := range util.NumberList(l, "") {
-			m[maps.Coordinate{X: x, Y: y}] = n
-		}
-	}
-
+	m := maps.NewIntMap(testData)
 	first, second := both(m)
 	fmt.Printf("first: %d\n", first)
 	fmt.Printf("second: %d\n", second)
 }
 
-func both(m map[maps.Coordinate]int) (int, int) {
+func both(m maps.IntMap) (int, int) {
 	var total int
 	step := 1
 	for ; ; step++ {
-		for c := range m {
-			m[c] = m[c] + 1
+		for _, c := range m.Coordinates() {
+			m.Inc(c)
 		}
 
 		flashed := make(map[maps.Coordinate]struct{})
 		for {
 			var count int
-			for c, v := range m {
+			for _, c := range m.Coordinates() {
+				v := m.At(c)
 				if v <= 9 {
 					continue
 				}
@@ -75,10 +69,8 @@ func both(m map[maps.Coordinate]int) (int, int) {
 				// not flashed and >= 9
 				count += 1
 				flashed[c] = struct{}{}
-				for _, ac := range c.Surrounding() {
-					if _, ok := m[ac]; ok {
-						m[ac] += 1
-					}
+				for _, ac := range m.Surrounding(c) {
+					m.Set(ac, m.At(ac)+1)
 				}
 			}
 			if count == 0 {
@@ -90,11 +82,11 @@ func both(m map[maps.Coordinate]int) (int, int) {
 			}
 		}
 
-		if len(flashed) == len(m) {
+		if len(flashed) == m.Length() {
 			break
 		}
 		for c := range flashed {
-			m[c] = 0
+			m.Set(c, 0)
 		}
 	}
 

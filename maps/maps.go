@@ -2,7 +2,8 @@ package maps
 
 import (
 	"fmt"
-	"sort"
+	"github.com/mbark/advent-of-code-2021/util"
+	"strconv"
 	"strings"
 )
 
@@ -37,40 +38,108 @@ func (c Coordinate) String() string {
 	return fmt.Sprintf("(x=%d,y=%d)", c.X, c.Y)
 }
 
-func MapString(m map[Coordinate]int) string {
-	yms := make(map[int]struct{})
-	for c := range m {
-		yms[c.Y] = struct{}{}
+type IntMap struct {
+	Columns int
+	Rows    int
+	Cells   [][]int
+}
+
+func NewIntMap(definition string) IntMap {
+	var cells [][]int
+
+	var rows, cols int
+	for y, l := range util.ReadInput(definition, "\n") {
+		rows = y
+		var row []int
+		for x, n := range util.NumberList(l, "") {
+			cols = x
+			row = append(row, n)
+		}
+
+		cells = append(cells, row)
 	}
 
-	var ys []int
-	for y := range yms {
-		ys = append(ys, y)
+	return IntMap{Columns: cols + 1, Rows: rows + 1, Cells: cells}
+}
+
+func (m IntMap) At(c Coordinate) int {
+	return m.Cells[c.Y][c.X]
+}
+
+func (m IntMap) Coordinates() []Coordinate {
+	coordinates := make([]Coordinate, m.Length())
+	for y, row := range m.Cells {
+		for x := range row {
+			coordinates[y*m.Rows+x] = Coordinate{Y: y, X: x}
+		}
 	}
 
-	sort.Ints(ys)
+	return coordinates
+}
 
-	var sb strings.Builder
-	for _, y := range ys {
-		xms := make(map[int]struct{})
-		for c := range m {
-			if c.Y != y {
+func (m *IntMap) Set(c Coordinate, val int) {
+	m.Cells[c.Y][c.X] = val
+}
+
+func (m *IntMap) Inc(c Coordinate) {
+	m.Cells[c.Y][c.X] += 1
+}
+
+func (m IntMap) Exists(c Coordinate) bool {
+	return c.X >= 0 && c.X < m.Columns &&
+		c.Y >= 0 && c.Y < m.Rows
+}
+
+func (m IntMap) filterNonExistent(coords []Coordinate) []Coordinate {
+	var cs []Coordinate
+	for _, c := range coords {
+		if m.Exists(c) {
+			cs = append(cs, c)
+		}
+	}
+
+	return cs
+}
+
+func (m IntMap) Adjacent(c Coordinate) []Coordinate {
+	var coordinates []Coordinate
+	for _, x := range []int{-1, 1} {
+		coordinates = append(coordinates, Coordinate{X: c.X + x, Y: c.Y})
+	}
+	for _, y := range []int{-1, 1} {
+		coordinates = append(coordinates, Coordinate{X: c.X, Y: c.Y + y})
+	}
+
+	return m.filterNonExistent(coordinates)
+}
+
+func (m IntMap) Surrounding(c Coordinate) []Coordinate {
+	var coordinates []Coordinate
+	for _, x := range []int{-1, 0, 1} {
+		for _, y := range []int{-1, 0, 1} {
+			if x == 0 && y == 0 {
 				continue
 			}
-			xms[c.X] = struct{}{}
-		}
 
-		var xs []int
-		for x := range xms {
-			xs = append(xs, x)
+			coordinates = append(coordinates, Coordinate{X: c.X + x, Y: c.Y + y})
 		}
+	}
 
-		sort.Ints(xs)
-		for _, x := range xs {
-			sb.WriteString(fmt.Sprintf("%2d", m[Coordinate{X: x, Y: y}]))
+	return m.filterNonExistent(coordinates)
+}
+
+func (m IntMap) String() string {
+	var sb strings.Builder
+	for _, row := range m.Cells {
+		for _, cell := range row {
+			sb.WriteString(strconv.Itoa(cell))
 		}
 		sb.WriteString("\n")
 	}
 
 	return sb.String()
+}
+
+func (m IntMap) Length() int {
+	return m.Rows * m.Columns
 }
