@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mbark/advent-of-code-2021/maps"
 	"github.com/mbark/advent-of-code-2021/util"
 	"sort"
 )
@@ -124,10 +125,10 @@ func main() {
 		vents = append(vents, util.NumberList(l, ""))
 	}
 
-	m := make(map[Coordinate]int)
+	m := make(map[maps.Coordinate]int)
 	for y, row := range vents {
 		for x, v := range row {
-			m[Coordinate{X: x, Y: y}] = v
+			m[maps.Coordinate{X: x, Y: y}] = v
 		}
 	}
 
@@ -137,26 +138,8 @@ func main() {
 	fmt.Printf("second: %d\n", second(m, lows))
 }
 
-type Coordinate struct {
-	X int
-	Y int
-}
-
-func (c Coordinate) Adjacent() []Coordinate {
-	return []Coordinate{
-		{X: c.X, Y: c.Y + 1}, // up
-		{X: c.X + 1, Y: c.Y}, // right
-		{X: c.X, Y: c.Y - 1}, // down
-		{X: c.X - 1, Y: c.Y}, // left
-	}
-}
-
-func (c Coordinate) String() string {
-	return fmt.Sprintf("(x=%d,y=%d)", c.X, c.Y)
-}
-
-func lowpoints(m map[Coordinate]int) []Coordinate {
-	var lowPoints []Coordinate
+func lowpoints(m map[maps.Coordinate]int) []maps.Coordinate {
+	var lowPoints []maps.Coordinate
 	for c, v := range m {
 		lowest := true
 		for _, ac := range c.Adjacent() {
@@ -178,7 +161,7 @@ func lowpoints(m map[Coordinate]int) []Coordinate {
 	return lowPoints
 }
 
-func first(m map[Coordinate]int, lows []Coordinate) int {
+func first(m map[maps.Coordinate]int, lows []maps.Coordinate) int {
 	var sum int
 	for _, c := range lows {
 		v := m[c]
@@ -188,13 +171,13 @@ func first(m map[Coordinate]int, lows []Coordinate) int {
 	return sum
 }
 
-func second(m map[Coordinate]int, lows []Coordinate) int {
-	var basins [][]Coordinate
-	visited := make(map[Coordinate]struct{})
+func second(m map[maps.Coordinate]int, lows []maps.Coordinate) int {
+	var basins [][]maps.Coordinate
+	visited := make(map[maps.Coordinate]struct{})
 
 	for _, c := range lows {
-		var basin []Coordinate
-		added := []Coordinate{c}
+		var basin []maps.Coordinate
+		added := []maps.Coordinate{c}
 		visited[c] = struct{}{}
 
 		for {
@@ -203,7 +186,7 @@ func second(m map[Coordinate]int, lows []Coordinate) int {
 			}
 			basin = append(basin, added...)
 
-			var next []Coordinate
+			var next []maps.Coordinate
 			for _, c := range added {
 				for _, ac := range c.Adjacent() {
 					if _, ok := visited[ac]; ok {
