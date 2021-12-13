@@ -62,6 +62,31 @@ func NewIntMap(definition string) IntMap {
 	return IntMap{Columns: cols + 1, Rows: rows + 1, Cells: cells}
 }
 
+func MapFromCoordinates(coordinates []Coordinate) IntMap {
+	var rows, cols int
+	for _, c := range coordinates {
+		if c.Y > rows {
+			rows = c.Y
+		}
+		if c.X > cols {
+			cols = c.X
+		}
+	}
+
+	rows, cols = rows+1, cols+1
+
+	cells := make([][]int, rows)
+	for i := range cells {
+		cells[i] = make([]int, cols)
+	}
+
+	for _, c := range coordinates {
+		cells[c.Y][c.X] = 1
+	}
+
+	return IntMap{Columns: cols, Rows: rows, Cells: cells}
+}
+
 func (m IntMap) At(c Coordinate) int {
 	return m.Cells[c.Y][c.X]
 }
