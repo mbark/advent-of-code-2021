@@ -1,11 +1,11 @@
 package main
 
 import (
+	"container/heap"
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/maps"
 	"github.com/mbark/advent-of-code-2021/util"
 	"math"
-	"sort"
 )
 
 var testData = `
@@ -139,36 +139,34 @@ func djikstra(m maps.IntMap) int {
 
 	start := maps.Coordinate{Y: 0, X: 0}
 	end := maps.Coordinate{Y: m.Columns - 1, X: m.Rows - 1}
+	cost := make([]int, m.ArraySize())
 
-	arrSize := m.ArraySize()
-	cost := make([]int, arrSize)
-	prev := make([]maps.Coordinate, arrSize)
-
+	pq := make(maps.PriorityQueue, len(m.Coordinates()))
+	i := 0
 	for _, c := range m.Coordinates() {
-		cost[m.ArrPos(c)] = math.MaxInt
+		prio := math.MaxInt
+		if c == start {
+			prio = 0
+		}
+
+		cost[m.ArrPos(c)] = prio
+		pq[i] = &maps.CoordinateItem{Coordinate: c, Priority: prio, Index: i}
+		i++
 	}
+	heap.Init(&pq)
 
-	cost[m.ArrPos(start)] = 0
-	next := []maps.Coordinate{start}
+	for len(pq) > 0 {
+		n := heap.Pop(&pq).(*maps.CoordinateItem)
 
-	for len(next) > 0 {
-		n := next[0]
-		var added []maps.Coordinate
-		for _, c := range m.Adjacent(n) {
-			newCost := cost[m.ArrPos(n)] + m.At(c)
+		for _, c := range m.Adjacent(n.Coordinate) {
+			newCost := cost[m.ArrPos(n.Coordinate)] + m.At(c)
 
 			pos := m.ArrPos(c)
 			if newCost < cost[pos] {
 				cost[pos] = newCost
-				prev[pos] = n
-				added = append(added, c)
+				heap.Push(&pq, &maps.CoordinateItem{Coordinate: c, Priority: newCost})
 			}
 		}
-
-		sort.Slice(added, func(i, j int) bool {
-			return m.At(added[i]) < m.At(added[j])
-		})
-		next = append(next[1:], added...)
 	}
 
 	return cost[m.ArrPos(end)]

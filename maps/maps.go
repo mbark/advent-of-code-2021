@@ -2,6 +2,7 @@ package maps
 
 import "C"
 import (
+	"container/heap"
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/util"
 	"strconv"
@@ -230,4 +231,47 @@ func (m IntMap) String() string {
 
 func (m IntMap) Length() int {
 	return m.Rows * m.Columns
+}
+
+type CoordinateItem struct {
+	Coordinate Coordinate
+	Priority int
+	Index    int
+}
+
+type PriorityQueue []*CoordinateItem
+
+func (pq PriorityQueue) Len() int { return len(pq) }
+
+func (pq PriorityQueue) Less(i, j int) bool {
+	return pq[i].Priority < pq[j].Priority
+}
+
+func (pq PriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].Index = i
+	pq[j].Index = j
+}
+
+func (pq *PriorityQueue) Push(x interface{}) {
+	n := len(*pq)
+	item := x.(*CoordinateItem)
+	item.Index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *PriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil  // avoid memory leak
+	item.Index = -1 // for safety
+	*pq = old[0 : n-1]
+	return item
+}
+
+func (pq *PriorityQueue) Update(item *CoordinateItem, value Coordinate, priority int) {
+	item.Coordinate = value
+	item.Priority = priority
+	heap.Fix(pq, item.Index)
 }
