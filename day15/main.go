@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/maps"
+	"github.com/mbark/advent-of-code-2021/util"
 	"math"
 	"sort"
 )
@@ -124,33 +125,42 @@ var in = `
 `
 
 func main() {
+	f := util.WithProfiling()
+	defer f()
+
 	m := maps.NewIntMap(in)
 	fmt.Printf("first: %d\n", djikstra(m))
 	fmt.Printf("second: %d\n", second(m))
 }
 
 func djikstra(m maps.IntMap) int {
+	f := util.WithTime()
+	defer f()
+
 	start := maps.Coordinate{Y: 0, X: 0}
 	end := maps.Coordinate{Y: m.Columns - 1, X: m.Rows - 1}
 
-	cost := make(map[maps.Coordinate]int)
-	prev := make(map[maps.Coordinate]maps.Coordinate)
+	arrSize := m.ArraySize()
+	cost := make([]int, arrSize)
+	prev := make([]maps.Coordinate, arrSize)
 
 	for _, c := range m.Coordinates() {
-		cost[c] = math.MaxInt
+		cost[m.ArrPos(c)] = math.MaxInt
 	}
 
-	cost[start] = 0
+	cost[m.ArrPos(start)] = 0
 	next := []maps.Coordinate{start}
 
 	for len(next) > 0 {
 		n := next[0]
 		var added []maps.Coordinate
 		for _, c := range m.Adjacent(n) {
-			newCost := cost[n] + m.At(c)
-			if newCost < cost[c] {
-				cost[c] = newCost
-				prev[c] = n
+			newCost := cost[m.ArrPos(n)] + m.At(c)
+
+			pos := m.ArrPos(c)
+			if newCost < cost[pos] {
+				cost[pos] = newCost
+				prev[pos] = n
 				added = append(added, c)
 			}
 		}
@@ -161,12 +171,11 @@ func djikstra(m maps.IntMap) int {
 		next = append(next[1:], added...)
 	}
 
-	return cost[end]
+	return cost[m.ArrPos(end)]
 }
 
 func second(m maps.IntMap) int {
 	var newMaps [][]maps.IntMap
-
 	for i := 0; i < 5; i++ {
 		var newRow []maps.IntMap
 		for j := 0; j < 5; j++ {

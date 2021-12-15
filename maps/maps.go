@@ -1,5 +1,6 @@
 package maps
 
+import "C"
 import (
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/util"
@@ -36,6 +37,10 @@ func (c Coordinate) Surrounding() []Coordinate {
 
 func (c Coordinate) String() string {
 	return fmt.Sprintf("(x=%d,y=%d)", c.X, c.Y)
+}
+
+func (m IntMap) ArraySize() int {
+	return (m.Rows + 1) * (m.Columns + 1)
 }
 
 type IntMap struct {
@@ -91,6 +96,10 @@ func (m IntMap) At(c Coordinate) int {
 	return m.Cells[c.Y][c.X]
 }
 
+func (m IntMap) ArrPos(c Coordinate) int {
+	return c.Y*m.Rows + c.X
+}
+
 func (m IntMap) Coordinates() []Coordinate {
 	coordinates := make([]Coordinate, m.Length())
 	for y, row := range m.Cells {
@@ -103,15 +112,15 @@ func (m IntMap) Coordinates() []Coordinate {
 }
 
 func (m IntMap) CopyWith(fn func(val int) int) IntMap {
-	var cells [][]int
+	cells := make([][]int, len(m.Cells))
 
-	for _, rows := range m.Cells {
-		var row []int
-		for _, cell := range rows {
-			row = append(row, fn(cell))
+	for i := range m.Cells {
+		row := make([]int, len(m.Cells[i]))
+		for j, cell := range m.Cells[i] {
+			row[j] = fn(cell)
 		}
 
-		cells = append(cells, row)
+		cells[i] = row
 	}
 
 	return IntMap{Columns: m.Columns, Rows: m.Rows, Cells: cells}
@@ -169,15 +178,24 @@ func (m IntMap) filterNonExistent(coords []Coordinate) []Coordinate {
 }
 
 func (m IntMap) Adjacent(c Coordinate) []Coordinate {
-	var coordinates []Coordinate
+	coordinates := make([]Coordinate, 4)
+	var at int
 	for _, x := range []int{-1, 1} {
-		coordinates = append(coordinates, Coordinate{X: c.X + x, Y: c.Y})
+		c := Coordinate{X: c.X + x, Y: c.Y}
+		if m.Exists(c) {
+			coordinates[at] = c
+			at += 1
+		}
 	}
 	for _, y := range []int{-1, 1} {
-		coordinates = append(coordinates, Coordinate{X: c.X, Y: c.Y + y})
+		c := Coordinate{X: c.X, Y: c.Y + y}
+		if m.Exists(c) {
+			coordinates[at] = c
+			at += 1
+		}
 	}
 
-	return m.filterNonExistent(coordinates)
+	return coordinates[:at]
 }
 
 func (m IntMap) Surrounding(c Coordinate) []Coordinate {
@@ -188,11 +206,14 @@ func (m IntMap) Surrounding(c Coordinate) []Coordinate {
 				continue
 			}
 
-			coordinates = append(coordinates, Coordinate{X: c.X + x, Y: c.Y + y})
+			c := Coordinate{X: c.X + x, Y: c.Y + y}
+			if m.Exists(c) {
+				coordinates = append(coordinates, c)
+			}
 		}
 	}
 
-	return m.filterNonExistent(coordinates)
+	return coordinates
 }
 
 func (m IntMap) String() string {
