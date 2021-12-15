@@ -102,6 +102,48 @@ func (m IntMap) Coordinates() []Coordinate {
 	return coordinates
 }
 
+func (m IntMap) CopyWith(fn func(val int) int) IntMap {
+	var cells [][]int
+
+	for _, rows := range m.Cells {
+		var row []int
+		for _, cell := range rows {
+			row = append(row, fn(cell))
+		}
+
+		cells = append(cells, row)
+	}
+
+	return IntMap{Columns: m.Columns, Rows: m.Rows, Cells: cells}
+}
+
+func Merged(maps [][]IntMap) IntMap {
+	var cells [][]int
+	var columns, rows int
+
+	for _, row := range maps {
+		rows += row[0].Rows
+	}
+	for _, col := range maps[0] {
+		columns += col.Columns
+	}
+
+	// for each map in the row
+	for _, mapRow := range maps {
+		// for each row in the map
+		for i := 0; i < mapRow[0].Rows; i++ {
+			var row []int
+			for _, mapCol := range mapRow {
+				row = append(row, mapCol.Cells[i]...)
+			}
+
+			cells = append(cells, row)
+		}
+	}
+
+	return IntMap{Columns: columns, Rows: rows, Cells: cells}
+}
+
 func (m *IntMap) Set(c Coordinate, val int) {
 	m.Cells[c.Y][c.X] = val
 }
