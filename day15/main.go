@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/maps"
-	"github.com/mbark/advent-of-code-2021/util"
 	"math"
 )
 
@@ -125,18 +124,12 @@ var in = `
 `
 
 func main() {
-	f := util.WithProfiling()
-	defer f()
-
 	m := maps.NewIntMap(in)
 	fmt.Printf("first: %d\n", djikstra(m))
 	fmt.Printf("second: %d\n", second(m))
 }
 
 func djikstra(m maps.IntMap) int {
-	f := util.WithTime()
-	defer f()
-
 	start := maps.Coordinate{Y: 0, X: 0}
 	end := maps.Coordinate{Y: m.Columns - 1, X: m.Rows - 1}
 	cost := make([]int, m.ArraySize())
