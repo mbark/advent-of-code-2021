@@ -13,7 +13,7 @@ const (
 )
 
 func main() {
-	s := strings.TrimPrefix(in, "target area: ")
+s := strings.TrimPrefix(in, "target area: ")
 	split := strings.Split(s, ", ")
 	xs := strings.Split(strings.TrimPrefix(split[0], "x="), "..")
 	ys := strings.Split(strings.TrimPrefix(split[1], "y="), "..")
@@ -32,7 +32,7 @@ func first(upperLeft, lowerRight maps.Coordinate) (int, int) {
 	var successCount int
 	var successfulMaxY int
 
-	for y := -100; y < 100; y++ {
+	for y := upperLeft.Y; y < -upperLeft.Y; y++ {
 		for x := 1; x <= lowerRight.X; x++ {
 			velx := x
 			vely := y
