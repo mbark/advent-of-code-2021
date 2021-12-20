@@ -49,9 +49,7 @@ func NewBoolMatrix(width, height int) map[int]map[int]bool {
 func WithTime() func() {
 	now := time.Now()
 
-	return func() {
-		fmt.Printf("time taken: %v\n", time.Now().Sub(now))
-	}
+	return func() { fmt.Printf("time taken: %v\n", time.Now().Sub(now)) }
 }
 
 func WithProfiling() func() {

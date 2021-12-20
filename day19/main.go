@@ -1235,6 +1235,27 @@ const (
 `
 )
 
+func main() {
+	fn := util.WithProfiling()
+	defer fn()
+
+	allRotations = calcAllRotations()
+
+	var scanners []Scanner
+	for i, sc := range util.ReadInput(in, "\n\n") {
+		var scans []maps.Coordinate3D
+		for _, s := range strings.Split(sc, "\n")[1:] {
+			scans = append(scans, maps.NewCoordinate3D(s))
+		}
+		scanners = append(scanners, Scanner{Index: i, Scans: scans})
+	}
+
+	f, s := solve(scanners)
+
+	fmt.Printf("first %d\n", f)
+	fmt.Printf("second %d\n", s)
+}
+
 type Scanner struct {
 	Index int
 	Scans []maps.Coordinate3D
@@ -1249,22 +1270,6 @@ func (s Scanner) String() string {
 	}
 
 	return sb.String()
-}
-
-func main() {
-	var scanners []Scanner
-	for i, sc := range util.ReadInput(in, "\n\n") {
-		var scans []maps.Coordinate3D
-		for _, s := range strings.Split(sc, "\n")[1:] {
-			scans = append(scans, maps.NewCoordinate3D(s))
-		}
-		scanners = append(scanners, Scanner{Index: i, Scans: scans})
-	}
-
-	f, s := solve(scanners)
-
-	fmt.Printf("first %d\n", f)
-	fmt.Printf("second %d\n", s)
 }
 
 type coordTuple struct {
@@ -1294,6 +1299,9 @@ func solve(scanners []Scanner) (int, int) {
 		composite[scan] = struct{}{}
 	}
 
+	l := toList(composite)
+	compositeDiffs := findDiffVectors(l, l)
+
 	distances := make(map[int]maps.Coordinate3D)
 	distances[0] = maps.Coordinate3D{}
 	for len(distances) < len(scanners) {
@@ -1307,9 +1315,8 @@ func solve(scanners []Scanner) (int, int) {
 					continue
 				}
 
-				scanDiffs1 := findDiffVectors(toList(composite))
-				scanDiffs2 := findDiffVectors(scanners[j].Scans)
-				matchings := findMatching(scanDiffs1, scanDiffs2)
+				scanDiffs2 := findDiffVectors(scanners[j].Scans, scanners[j].Scans)
+				matchings := findMatching(compositeDiffs, scanDiffs2)
 				if len(matchings) == 0 {
 					continue
 				}
@@ -1323,6 +1330,12 @@ func solve(scanners []Scanner) (int, int) {
 				distances[j] = dis
 				for _, scan := range scanners[j].Scans {
 					composite[r.Apply(scan).Add(dis)] = struct{}{}
+				}
+				for diff, val := range scanDiffs2 {
+					compositeDiffs[diff] = coordTuple{
+						from: r.Apply(val.from).Add(dis),
+						to:   r.Apply(val.to).Add(dis),
+					}
 				}
 			}
 		}
@@ -1356,23 +1369,20 @@ func toList(coords map[maps.Coordinate3D]struct{}) []maps.Coordinate3D {
 	return l
 }
 
-func findDiffVectors(scans []maps.Coordinate3D) map[maps.Coordinate3D]coordTuple {
+func findDiffVectors(scans1, scans2 []maps.Coordinate3D) map[maps.Coordinate3D]coordTuple {
 	diffs := make(map[maps.Coordinate3D]coordTuple)
-	for i, scans1 := range scans {
-		for j, scans2 := range scans {
-			if i >= j {
-				continue
-			}
-
-			for _, r := range allRotations() {
-				diffs[r.Apply(scans1).Diff(r.Apply(scans2))] = coordTuple{
-					from: scans1,
-					to:   scans2,
+	for _, c1 := range scans1 {
+		for _, c2 := range scans2 {
+			for _, r := range allRotations {
+				diffs[r.Apply(c1).Diff(r.Apply(c2))] = coordTuple{
+					from: c1,
+					to:   c2,
 				}
 			}
 		}
 	}
 
+	delete(diffs, maps.Coordinate3D{})
 	return diffs
 }
 
@@ -1429,7 +1439,7 @@ func findMatching(scanDiffs1, scanDiffs2 map[maps.Coordinate3D]coordTuple) map[m
 }
 
 func distance(matches map[maps.Coordinate3D]maps.Coordinate3D) (maps.Coordinate3D, maps.Rotation3D) {
-	for _, r := range allRotations() {
+	for _, r := range allRotations {
 		// also move the values
 		counts := make(map[maps.Coordinate3D]int)
 		for k, m := range matches {
@@ -1454,7 +1464,9 @@ func distance(matches map[maps.Coordinate3D]maps.Coordinate3D) (maps.Coordinate3
 	return maps.Coordinate3D{}, nil
 }
 
-func allRotations() []maps.Rotation3D {
+var allRotations []maps.Rotation3D
+
+func calcAllRotations() []maps.Rotation3D {
 	var directions []maps.RotationDirection
 	for _, x := range []bool{false, true} {
 		for _, y := range []bool{false, true} {
