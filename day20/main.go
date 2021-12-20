@@ -137,77 +137,84 @@ func main() {
 	s := util.ReadInput(in, "\n\n")
 	enhancement = strings.ReplaceAll(s[0], "\n", "")
 
+	var startSize int
 	for y, row := range strings.Split(s[1], "\n") {
 		for x, c := range row {
-			image[maps.Coordinate{X: x, Y: y}] = c == '#'
+			if c == '#' {
+				image[maps.Coordinate{X: x, Y: y}] = true
+			}
 		}
+
+		startSize = y
 	}
 
-	fmt.Printf("first: %d\n", enhance(enhancement, image, 2))
-	fmt.Printf("first: %d\n", enhance(enhancement, image, 50))
+	fmt.Printf("first: %d\n", enhance(enhancement, image, startSize, 2))
+	fmt.Printf("first: %d\n", enhance(enhancement, image, startSize, 50))
 }
 
-func enhance(enhancement string, image map[maps.Coordinate]bool, steps int) int {
+var binvals = []int{256, 128, 64, 32, 16, 8, 4, 2, 1}
+
+func enhance(enhancement string, image map[maps.Coordinate]bool, startSize, steps int) int {
+	var coords []maps.Coordinate
+	for c := range image {
+		coords = append(coords, c)
+	}
+	// it will grow with 1 per step
+	m := maps.MapFromCoordinates(coords).WithPadding(steps, steps, steps, steps)
+
+	minX, minY := steps, steps
+	var maxX, maxY = steps + startSize, steps + startSize
+
 	for step := 0; step < steps; step++ {
-		defPixel := false
+		defPixel := 0
 		if step%2 == 1 && enhancement[0] == '#' {
-			defPixel = true
+			defPixel = 1
 		}
 
-		var minX, maxX, minY, maxY int
-		for c := range image {
-			if c.X < minX {
-				minX = c.X
-			}
-			if c.Y < minY {
-				minY = c.Y
-			}
-
-			if c.X > maxX {
-				maxX = c.X
-			}
-			if c.Y > maxY {
-				maxY = c.Y
-			}
-		}
-
-		next := make(map[maps.Coordinate]bool)
+		next := m.CopyWith(func(i int) int { return i })
 		for x := minX - 1; x <= maxX+1; x++ {
 			for y := minY - 1; y <= maxY+1; y++ {
-				var sb strings.Builder
-
+				var binval int
+				var idx int
 				for _, yd := range []int{-1, 0, 1} {
 					for _, xd := range []int{-1, 0, 1} {
-						val, ok := image[maps.Coordinate{X: x + xd, Y: y + yd}]
-						if !ok {
+						var val int
+						if (y+yd < minY) || (y+yd > maxY) {
 							val = defPixel
-						}
-
-						if val {
-							sb.WriteRune('1')
+						} else if (x+xd < minX) || (x+xd > maxX) {
+							val = defPixel
 						} else {
-							sb.WriteRune('0')
+							val = m.At(maps.Coordinate{X: x + xd, Y: y + yd})
 						}
-					}
-				}
 
-				c := maps.Coordinate{X: x, Y: y}
-				val := util.Btoi(sb.String())
-				pix := enhancement[int(val)]
-				if pix == '#' {
-					next[c] = true
-				} else {
-					next[c] = false
+						if val == 1 {
+							binval += binvals[idx]
+						}
+						idx += 1
+					}
+
+					c := maps.Coordinate{X: x, Y: y}
+					pix := enhancement[binval]
+					if pix == '#' {
+						next.Set(c, 1)
+					} else {
+						next.Set(c, 0)
+					}
 				}
 			}
 		}
 
-		image = next
+		m = next
+		// grow map by 1
+		minX -= 1
+		minY -= 1
+		maxX += 1
+		maxY += 1
 	}
 
 	var count int
-	for _, i := range image {
-		if i {
+	for _, c := range m.Coordinates() {
+		if m.At(c) == 1 {
 			count += 1
 		}
 	}

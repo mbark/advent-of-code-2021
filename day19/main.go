@@ -1428,7 +1428,7 @@ func findMatching(scanDiffs1, scanDiffs2 map[maps.Coordinate3D]coordTuple) map[m
 	return matchings
 }
 
-func distance(matches map[maps.Coordinate3D]maps.Coordinate3D) (maps.Coordinate3D, maps.Rotation) {
+func distance(matches map[maps.Coordinate3D]maps.Coordinate3D) (maps.Coordinate3D, maps.Rotation3D) {
 	for _, r := range allRotations() {
 		// also move the values
 		counts := make(map[maps.Coordinate3D]int)
@@ -1454,7 +1454,7 @@ func distance(matches map[maps.Coordinate3D]maps.Coordinate3D) (maps.Coordinate3
 	return maps.Coordinate3D{}, nil
 }
 
-func allRotations() []maps.Rotation {
+func allRotations() []maps.Rotation3D {
 	var directions []maps.RotationDirection
 	for _, x := range []bool{false, true} {
 		for _, y := range []bool{false, true} {
@@ -1468,7 +1468,7 @@ func allRotations() []maps.Rotation {
 		}
 	}
 
-	var rotations []maps.Rotation
+	var rotations []maps.Rotation3D
 	for _, d := range directions {
 		rotations = append(rotations, d)
 
