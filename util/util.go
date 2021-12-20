@@ -83,3 +83,9 @@ func AbsInt(i int) int {
 
 	return i
 }
+
+func Btoi(s string) int64 {
+	i, _ := strconv.ParseInt(s, 2, 64)
+	return i
+}
+

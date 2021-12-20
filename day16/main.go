@@ -25,7 +25,7 @@ C20D59802D2B0B6713C6B4D1600ACE7E3C179BFE391E546CC017F004A4F513C9D973A1B2F32C3004
 )
 
 func main() {
-	binary := toBinary(util.ReadInput(in, "\n")[0])
+	binary := ToBinary(util.ReadInput(in, "\n")[0])
 	p := packet(binary)
 
 	fmt.Printf("first: %d\n", first(p))
@@ -52,7 +52,7 @@ func first(p Packet) int64 {
 func second(p Packet) int64 {
 	switch pack := p.(type) {
 	case LiteralPacket:
-		return btoi(pack.Value)
+		return util.Btoi(pack.Value)
 
 	case OperatorPacket:
 		switch pack.TypeID {
@@ -122,16 +122,6 @@ func second(p Packet) int64 {
 	return 0
 }
 
-func toBinary(s string) string {
-	var msg strings.Builder
-	for _, c := range s {
-		i, _ := strconv.ParseInt(string(c), 16, 64)
-		msg.WriteString(fmt.Sprintf("%04s", strconv.FormatInt(i, 2)))
-	}
-
-	return msg.String()
-}
-
 type Packet interface {
 	Length() int64
 }
@@ -151,8 +141,8 @@ type OperatorPacket struct {
 }
 
 func packet(s string) Packet {
-	version := btoi(s[:3])
-	typeID := btoi(s[3:6])
+	version := util.Btoi(s[:3])
+	typeID := util.Btoi(s[3:6])
 
 	switch typeID {
 	case 4:
@@ -200,7 +190,7 @@ func NewOperator(version, typeID int64, s string) OperatorPacket {
 	var packets []Packet
 	var offset int64
 	if bitCount == 15 {
-		length := btoi(s[:bitCount])
+		length := util.Btoi(s[:bitCount])
 
 		for offset < length {
 			nextp := packet(s[offset+bitCount:])
@@ -208,7 +198,7 @@ func NewOperator(version, typeID int64, s string) OperatorPacket {
 			packets = append(packets, nextp)
 		}
 	} else if bitCount == 11 {
-		nr := btoi(s[:bitCount])
+		nr := util.Btoi(s[:bitCount])
 
 		for i := 0; i < int(nr); i++ {
 			nextp := packet(s[offset+bitCount:])
@@ -229,7 +219,12 @@ func (n OperatorPacket) Length() int64 {
 	return n.Bits
 }
 
-func btoi(s string) int64 {
-	i, _ := strconv.ParseInt(s, 2, 64)
-	return i
+func ToBinary(s string) string {
+	var msg strings.Builder
+	for _, c := range s {
+		i, _ := strconv.ParseInt(string(c), 16, 64)
+		msg.WriteString(fmt.Sprintf("%04s", strconv.FormatInt(i, 2)))
+	}
+
+	return msg.String()
 }

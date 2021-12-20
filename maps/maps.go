@@ -125,45 +125,6 @@ func (c Coordinate3D) ApplyRotation(x, y, z int) Coordinate3D {
 	return Coordinate3D{X: x * c.X, Y: y * c.Y, Z: z * c.Z}
 }
 
-func (c Coordinate3D) Rotations() []Coordinate3D {
-	vals := []int{c.X, c.Y, c.Z}
-	var permutations []Coordinate3D
-
-	// each permutation of x,y,z
-	for i, x := range vals {
-		for j, y := range vals {
-			for k, z := range vals {
-				if i == j || j == k || i == k {
-					continue
-				}
-
-				permutations = append(permutations, Coordinate3D{
-					X: x,
-					Y: y,
-					Z: z,
-				})
-			}
-		}
-	}
-
-	var coordinates []Coordinate3D
-	for _, c := range permutations {
-		for _, x := range []int{1, -1} {
-			for _, y := range []int{1, -1} {
-				for _, z := range []int{1, -1} {
-					coordinates = append(coordinates,
-						Coordinate3D{X: x * c.X, Y: y * c.Y, Z: z * c.Z})
-				}
-			}
-		}
-	}
-
-	coordinates = append(coordinates, permutations...)
-	fmt.Println(len(coordinates))
-
-	return coordinates
-}
-
 type Coordinate struct {
 	X int
 	Y int
