@@ -262,3 +262,4 @@ func (pq *PriorityQueue) Update(item *CoordinateItem, value Coordinate, priority
 	item.Priority = priority
 	heap.Fix(pq, item.Index)
 }
+
