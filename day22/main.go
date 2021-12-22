@@ -599,33 +599,41 @@ var procedureArea = maps.Cuboid{
 }
 
 func count(steps []Step) int {
-	cuboids := make(map[maps.Cuboid]bool)
+	var cuboids []maps.Cuboid
 	for _, step := range steps {
-		for cuboid, val := range cuboids {
-			switch {
-			case cuboid.Contains(step.Cube) && val == step.On:
-				continue
+		var next []maps.Cuboid
 
-			case step.Cube.Contains(cuboid) && val == step.On:
-				delete(cuboids, cuboid)
+	CuboidLoop:
+		for _, cuboid := range cuboids {
+			switch {
+			case cuboid.Contains(step.Cube) && step.On:
+				next = append(next, cuboid)
+				// cuboid contains this step, we're done
+				break CuboidLoop
+
+			case step.Cube.Contains(cuboid):
+				// ignore == remove from list
 
 			case step.Cube.IsOverlapping(cuboid):
-				delete(cuboids, cuboid)
 				_, _, overlap := step.Cube.Subdivide(cuboid)
 				for _, o := range overlap {
-					cuboids[o] = val
+					next = append(next, o)
 				}
+
+			default:
+				next = append(next, cuboid)
 			}
 		}
 
-		cuboids[step.Cube] = step.On
+		if step.On {
+			next = append(next, step.Cube)
+		}
+		cuboids = next
 	}
 
 	var turnedOn int
-	for c, val := range cuboids {
-		if val {
-			turnedOn += c.Size()
-		}
+	for _, c := range cuboids {
+		turnedOn += c.Size()
 	}
 
 	return turnedOn
