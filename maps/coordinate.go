@@ -7,6 +7,22 @@ type Coordinate struct {
 	Y int
 }
 
+func (c Coordinate) Up() Coordinate {
+	return Coordinate{X: c.X, Y: c.Y - 1}
+}
+
+func (c Coordinate) Right() Coordinate {
+	return Coordinate{X: c.X + 1, Y: c.Y}
+}
+
+func (c Coordinate) Down() Coordinate {
+	return Coordinate{X: c.X, Y: c.Y + 1}
+}
+
+func (c Coordinate) Left() Coordinate {
+	return Coordinate{X: c.X - 1, Y: c.Y}
+}
+
 func (c Coordinate) Adjacent() []Coordinate {
 	return []Coordinate{
 		{X: c.X, Y: c.Y + 1}, // up
