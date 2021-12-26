@@ -3,6 +3,7 @@ package util
 import (
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"runtime/pprof"
 	"strconv"
@@ -94,3 +95,6 @@ func Btoi(s string) int64 {
 	return i
 }
 
+func PowInt(x, y int) int {
+	return int(math.Pow(float64(x), float64(y)))
+}

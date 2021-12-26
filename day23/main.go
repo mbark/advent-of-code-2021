@@ -62,6 +62,7 @@ type inNode struct {
 func main() {
 	state := parseInput(in)
 	state2 := parseInput(in2)
+
 	fmt.Printf("first: %d\n", solve(state))
 	fmt.Printf("first: %d\n", solve(state2))
 }
