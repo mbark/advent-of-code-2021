@@ -430,6 +430,30 @@ func (m Move) Do(s State) State {
 	return State{Positions: news, Graph: s.Graph}
 }
 
+func (s State) Heuristic() int {
+	var sum int
+
+	for c, n := range s.Graph {
+		a := s.Positions[c]
+		if n.IsRoom && a != "" && n.RoomFor != a {
+			yMove := c.Y - 1
+			xMove := util.AbsInt(c.X - a.RoomX())
+			sum += (yMove + xMove) * a.Cost()
+		}
+
+		if n.IsHallway && a != "" {
+			xMove := util.AbsInt(c.X - a.RoomX())
+			sum += xMove * a.Cost()
+		}
+
+		if n.IsRoom && a == "" {
+			sum += (c.Y - 1) * n.RoomFor.Cost()
+		}
+	}
+
+	return sum
+}
+
 type Node struct {
 	Coordinate maps.Coordinate
 	Neighbors  []Node
@@ -476,7 +500,7 @@ func djikstra(start State, end State, graph Graph) int {
 			if !ok || newCost < currCost {
 				prev[hash] = n.State
 				cost[hash] = newCost
-				heap.Push(&pq, &Item{State: nextState, Priority: newCost})
+				heap.Push(&pq, &Item{State: nextState, Priority: newCost + nextState.Heuristic()})
 			}
 		}
 	}
