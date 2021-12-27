@@ -49,3 +49,38 @@ func (c Coordinate) String() string {
 	return fmt.Sprintf("(x=%d,y=%d)", c.X, c.Y)
 }
 
+type CoordinateArray struct {
+	Coordinates []Coordinate
+
+	Y int
+	X int
+}
+
+func NewCoordinateArray(coords []Coordinate) CoordinateArray {
+	var x, y int
+	for _, c := range coords {
+		if c.X > x {
+			x = c.X
+		}
+		if c.Y > y {
+			y = c.Y
+		}
+	}
+
+	return CoordinateArray{Coordinates: coords, X: x, Y: y}
+}
+
+func (arr CoordinateArray) Size() int {
+	return arr.Y * arr.X
+}
+
+func (arr CoordinateArray) Index(c Coordinate) int {
+	return c.Y*arr.Y + c.X
+}
+
+func (arr CoordinateArray) Coordinate(i int) Coordinate {
+	y := i / 13
+	x := i % 13
+
+	return Coordinate{Y: y, X: x}
+}

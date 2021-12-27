@@ -235,22 +235,15 @@ func (s State) IsEmpty(c maps.Coordinate) bool {
 	return !ok
 }
 
-func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from []maps.Coordinate, a Amphipod) []Move {
+func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from maps.Coordinate, at maps.Coordinate, steps int, a Amphipod) []Move {
 	var moves []Move
-	at := from[len(from)-1]
 
 	// we've already been here!
 	if _, ok := visited[at]; ok {
 		return nil
 	}
 
-	vis := make(map[maps.Coordinate]struct{}, len(visited))
-	for k, v := range visited {
-		vis[k] = v
-	}
-	visited = vis
 	visited[at] = struct{}{}
-
 	node, exists := s.Graph[at]
 	switch {
 	case !exists:
@@ -262,12 +255,10 @@ func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from []maps.Coordi
 		return nil
 
 	case node.IsRoom && node.RoomFor != a:
-		// if we're in the wrong room just move upwards
-		return s.MovesFor(visited, append(from, at.Up()), a)
+		// if we're in the wrong room move to the corridor
+		return s.MovesFor(visited, from, maps.Coordinate{X: at.X, Y: 1}, steps+at.Y-1, a)
 
 	case node.IsRoom && node.RoomFor == a:
-		moveDown := s.MovesFor(visited, append(from, at.Down()), a)
-
 		roomDone := true
 		for down, ok := s.Graph[at.Down()]; ok; down, ok = s.Graph[down.Coordinate.Down()] {
 			amphiDown := s.Positions[down.Coordinate]
@@ -277,35 +268,34 @@ func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from []maps.Coordi
 			}
 		}
 
-		switch {
-		case moveDown != nil:
-			// we can move down in our room, do that
-			return moveDown
-
-		case roomDone:
-			return []Move{NewMove(from, at, a)}
-
-		default:
-			return s.MovesFor(visited, append(from, at.Up()), a)
+		if roomDone {
+			return []Move{NewMove(from, at, steps, a)}
 		}
+
+		moveDown := s.MovesFor(visited, from, at.Down(), steps+1, a)
+		if moveDown != nil {
+			return moveDown
+		}
+
+		return s.MovesFor(visited, from, at.Up(), steps+1, a)
 
 	case node.IsHallway:
 		down := s.Graph[at.Down()]
 		if node.IsAboveRoom && down.RoomFor == a {
 			// check if we can move into our room
-			moves = append(moves, s.MovesFor(visited, append(from, down.Coordinate), a)...)
+			moveDown := s.MovesFor(visited, from, down.Coordinate, steps+1, a)
+			if moveDown != nil {
+				return moveDown
+			}
 		}
 
-		started := s.Graph[from[0]]
+		started := s.Graph[from]
 		if !node.IsAboveRoom && !started.IsHallway {
-			moves = append(moves, NewMove(from, at, a))
+			moves = append(moves, NewMove(from, at, steps, a))
 		}
 
-		moveLeft := s.MovesFor(visited, append(from, at.Left()), a)
-		moveRight := s.MovesFor(visited, append(from, at.Right()), a)
-
-		moves = append(moves, moveLeft...)
-		moves = append(moves, moveRight...)
+		moves = append(moves, s.MovesFor(visited, from, at.Left(), steps+1, a)...)
+		moves = append(moves, s.MovesFor(visited, from, at.Right(), steps+1, a)...)
 	}
 
 	return moves
@@ -321,7 +311,7 @@ func (s State) MoveFrom(at maps.Coordinate, a Amphipod) []Move {
 	switch {
 	case node.IsRoom && node.RoomFor != a:
 		// if we're in the wrong room just move upwards
-		return s.MovesFor(visited, []maps.Coordinate{at, at.Up()}, a)
+		return s.MovesFor(visited, at, at.Up(), 1, a)
 
 	case node.IsRoom && node.RoomFor == a:
 		down := s.Graph[at.Down()]
@@ -330,7 +320,7 @@ func (s State) MoveFrom(at maps.Coordinate, a Amphipod) []Move {
 		switch {
 		case amphiDown != down.RoomFor:
 			// we're in the right room but the wrong amphipod is below, we need to move up
-			return s.MovesFor(visited, []maps.Coordinate{at, at.Up()}, a)
+			return s.MovesFor(visited, at, at.Up(), 1, a)
 
 		default:
 			return nil
@@ -340,25 +330,25 @@ func (s State) MoveFrom(at maps.Coordinate, a Amphipod) []Move {
 		switch {
 		case node.IsLeftCorridor:
 			// we can only move right from the left corridor
-			return s.MovesFor(visited, []maps.Coordinate{at, at.Right()}, a)
+			return s.MovesFor(visited, at, at.Right(), 1, a)
 
 		case node.IsRightCorridor:
 			// we can only move left from the right corridor
-			return s.MovesFor(visited, []maps.Coordinate{at, at.Left()}, a)
+			return s.MovesFor(visited, at, at.Left(), 1, a)
 
 		case at.X > a.RoomX():
-			return s.MovesFor(visited, []maps.Coordinate{at, at.Left()}, a)
+			return s.MovesFor(visited, at, at.Left(), 1, a)
 
 		case at.X < a.RoomX():
-			return s.MovesFor(visited, []maps.Coordinate{at, at.Right()}, a)
+			return s.MovesFor(visited, at, at.Right(), 1, a)
 		}
 	}
 
 	return moves
 }
 
-func (a Amphipod) MoveCost(coordinates []maps.Coordinate) int {
-	return a.Cost() * (len(coordinates) - 1)
+func (a Amphipod) MoveCost(steps int) int {
+	return a.Cost() * (steps)
 }
 
 func (a Amphipod) RoomX() int {
@@ -381,11 +371,7 @@ func (s State) Moves() []Move {
 	var moves []Move
 	for c, a := range s.Positions {
 		movesFor := s.MoveFrom(c, a)
-		for _, m := range movesFor {
-			if m.Cost != 0 && m.From != m.To {
-				moves = append(moves, m)
-			}
-		}
+		moves = append(moves, movesFor...)
 	}
 
 	return moves
@@ -427,8 +413,8 @@ func (m Move) String() string {
 	return fmt.Sprintf("(%d) %s => %s", m.Cost, m.From, m.To)
 }
 
-func NewMove(from []maps.Coordinate, to maps.Coordinate, a Amphipod) Move {
-	return Move{To: to, From: from[0], Cost: a.MoveCost(from)}
+func NewMove(from maps.Coordinate, to maps.Coordinate, steps int, a Amphipod) Move {
+	return Move{To: to, From: from, Cost: a.MoveCost(steps)}
 }
 
 func (m Move) Do(s State) State {
@@ -465,6 +451,9 @@ func solve(state State) int {
 }
 
 func djikstra(start State, end State, graph Graph) int {
+	f := util.WithTime()
+	defer f()
+
 	cost := make(map[uint32]int)
 	prev := make(map[uint32]State)
 
@@ -495,6 +484,10 @@ func djikstra(start State, end State, graph Graph) int {
 	p := EndState(graph)
 	path := []State{p}
 	for p.Hash() != start.Hash() {
+		if len(p.Positions) == 0 {
+			panic("no way back!")
+		}
+
 		path = append(path, p)
 		hash := p.Hash()
 		pr := prev[hash]
