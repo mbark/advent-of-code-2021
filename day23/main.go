@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mbark/advent-of-code-2021/maps"
 	"github.com/mbark/advent-of-code-2021/util"
+	"math/rand"
 	"strings"
 )
 
@@ -60,6 +61,8 @@ type inNode struct {
 }
 
 func main() {
+	f := util.WithProfiling()
+	defer f()
 	state := parseInput(in)
 	state2 := parseInput(in2)
 
@@ -184,8 +187,36 @@ func (s State) String() string {
 	return sb.String()
 }
 
-func (s State) Hash() string {
-	return s.String()
+var bitstrings [7 * 13][4]uint32
+var boardSize = 7 * 13
+
+var ampphipodIndex = map[Amphipod]int{
+	"A": 0,
+	"B": 1,
+	"C": 2,
+	"D": 3,
+}
+
+func init() {
+	for i := 0; i < boardSize; i++ {
+		var bits [4]uint32
+		for j := 0; j < 4; j++ {
+			bits[j] = rand.Uint32()
+		}
+
+		bitstrings[i] = bits
+	}
+}
+
+// Hash calculates a Zobrist hash
+func (s State) Hash() uint32 {
+	var h uint32
+	for c, a := range s.Positions {
+		j := ampphipodIndex[a]
+		h = h ^ bitstrings[13*c.Y+c.X][j]
+	}
+
+	return h
 }
 
 func (s State) IsDone() bool {
@@ -434,8 +465,8 @@ func solve(state State) int {
 }
 
 func djikstra(start State, end State, graph Graph) int {
-	cost := make(map[string]int)
-	prev := make(map[string]State)
+	cost := make(map[uint32]int)
+	prev := make(map[uint32]State)
 
 	var pq PriorityQueue
 	heap.Init(&pq)
@@ -473,10 +504,6 @@ func djikstra(start State, end State, graph Graph) int {
 
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
-	}
-
-	for i := 0; i < len(path)-1; i++ {
-		fmt.Println(path[i])
 	}
 
 	return cost[end.Hash()]
