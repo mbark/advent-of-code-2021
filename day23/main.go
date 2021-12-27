@@ -88,7 +88,7 @@ func parseInput(in string) State {
 		}
 	}
 
-	pos := make(map[maps.Coordinate]Amphipod)
+	pos := make(map[Amphipod][]maps.Coordinate)
 	graph := make(Graph)
 	for c, nn := range m {
 		if !nn.empty {
@@ -96,7 +96,7 @@ func parseInput(in string) State {
 		}
 
 		if nn.amphi != "" {
-			pos[c] = Amphipod(nn.amphi)
+			pos[Amphipod(nn.amphi)] = append(pos[Amphipod(nn.amphi)], c)
 		}
 
 		var neighbors []maps.Coordinate
@@ -146,12 +146,39 @@ func parseInput(in string) State {
 		n.Neighbors = neighbors
 	}
 
-	return State{Positions: pos, Graph: graph}
+	var positions Positions
+	for a, c := range pos {
+		positions = append(positions, AmphipodPositions{
+			Amphipod:    a,
+			Coordinates: c,
+		})
+	}
+
+	return State{Positions: positions, Graph: graph}
 }
 
 type State struct {
-	Positions map[maps.Coordinate]Amphipod
+	Positions Positions
 	Graph     Graph
+}
+
+type AmphipodPositions struct {
+	Amphipod    Amphipod
+	Coordinates []maps.Coordinate
+}
+
+type Positions []AmphipodPositions
+
+func (p Positions) At(c maps.Coordinate) Amphipod {
+	for _, s := range p {
+		for _, ac := range s.Coordinates {
+			if ac == c {
+				return s.Amphipod
+			}
+		}
+	}
+
+	return ""
 }
 
 func (s State) String() string {
@@ -167,7 +194,7 @@ func (s State) String() string {
 		for x := range row {
 			c := maps.Coordinate{X: x, Y: y}
 			_, ok := s.Graph[c]
-			a := s.Positions[c]
+			a := s.Positions.At(c)
 			switch {
 			case !ok:
 				sb.WriteString("#")
@@ -190,7 +217,7 @@ func (s State) String() string {
 var bitstrings [7 * 13][4]uint32
 var boardSize = 7 * 13
 
-var ampphipodIndex = map[Amphipod]int{
+var amphipodIndex = map[Amphipod]int{
 	"A": 0,
 	"B": 1,
 	"C": 2,
@@ -211,19 +238,23 @@ func init() {
 // Hash calculates a Zobrist hash
 func (s State) Hash() uint32 {
 	var h uint32
-	for c, a := range s.Positions {
-		j := ampphipodIndex[a]
-		h = h ^ bitstrings[13*c.Y+c.X][j]
+	for _, a := range s.Positions {
+		j := amphipodIndex[a.Amphipod]
+		for _, c := range a.Coordinates {
+			h = h ^ bitstrings[13*c.Y+c.X][j]
+		}
 	}
 
 	return h
 }
 
 func (s State) IsDone() bool {
-	for c, a := range s.Positions {
-		n := s.Graph[c]
-		if !n.IsRoom || n.RoomFor != a {
-			return false
+	for _, a := range s.Positions {
+		for _, c := range a.Coordinates {
+			n := s.Graph[c]
+			if !n.IsRoom || n.RoomFor != a.Amphipod {
+				return false
+			}
 		}
 	}
 
@@ -231,8 +262,8 @@ func (s State) IsDone() bool {
 }
 
 func (s State) IsEmpty(c maps.Coordinate) bool {
-	_, ok := s.Positions[c]
-	return !ok
+	a := s.Positions.At(c)
+	return a == ""
 }
 
 func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from maps.Coordinate, at maps.Coordinate, steps int, a Amphipod) []Move {
@@ -261,7 +292,7 @@ func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from maps.Coordina
 	case node.IsRoom && node.RoomFor == a:
 		roomDone := true
 		for down, ok := s.Graph[at.Down()]; ok; down, ok = s.Graph[down.Coordinate.Down()] {
-			amphiDown := s.Positions[down.Coordinate]
+			amphiDown := s.Positions.At(down.Coordinate)
 			if amphiDown != node.RoomFor {
 				roomDone = false
 				break
@@ -315,7 +346,7 @@ func (s State) MoveFrom(at maps.Coordinate, a Amphipod) []Move {
 
 	case node.IsRoom && node.RoomFor == a:
 		down := s.Graph[at.Down()]
-		amphiDown := s.Positions[down.Coordinate]
+		amphiDown := s.Positions.At(down.Coordinate)
 
 		switch {
 		case amphiDown != down.RoomFor:
@@ -369,23 +400,30 @@ func (a Amphipod) RoomX() int {
 
 func (s State) Moves() []Move {
 	var moves []Move
-	for c, a := range s.Positions {
-		movesFor := s.MoveFrom(c, a)
-		moves = append(moves, movesFor...)
+	for _, a := range s.Positions {
+		for _, c := range a.Coordinates {
+			movesFor := s.MoveFrom(c, a.Amphipod)
+			moves = append(moves, movesFor...)
+		}
 	}
 
 	return moves
 }
 
 func EndState(g Graph) State {
-	pos := make(map[maps.Coordinate]Amphipod)
+	pos := make(map[Amphipod][]maps.Coordinate)
 	for c, n := range g {
 		if n.IsRoom {
-			pos[c] = n.RoomFor
+			pos[n.RoomFor] = append(pos[n.RoomFor], c)
 		}
 	}
 
-	return State{Positions: pos, Graph: g}
+	var positions Positions
+	for a, c := range pos {
+		positions = append(positions, AmphipodPositions{Amphipod: a, Coordinates: c})
+	}
+
+	return State{Positions: positions, Graph: g}
 }
 
 func (a Amphipod) Cost() int {
@@ -418,14 +456,30 @@ func NewMove(from maps.Coordinate, to maps.Coordinate, steps int, a Amphipod) Mo
 }
 
 func (m Move) Do(s State) State {
-	news := make(map[maps.Coordinate]Amphipod, len(s.Positions))
-	for k, v := range s.Positions {
-		if k == m.From {
-			continue
+	news := make(Positions, len(s.Positions))
+	for i, a := range s.Positions {
+		var moved bool
+		for _, c := range a.Coordinates {
+			if c == m.From {
+				moved = true
+				break
+			}
 		}
-		news[k] = v
+
+		if moved {
+			coordinates := make([]maps.Coordinate, len(a.Coordinates))
+			for i, c := range a.Coordinates {
+				if c == m.From {
+					coordinates[i] = m.To
+				} else {
+					coordinates[i] = c
+				}
+			}
+			news[i] = AmphipodPositions{Amphipod: a.Amphipod, Coordinates: coordinates}
+		} else {
+			news[i] = a
+		}
 	}
-	news[m.To] = s.Positions[m.From]
 
 	return State{Positions: news, Graph: s.Graph}
 }
@@ -434,7 +488,7 @@ func (s State) Heuristic() int {
 	var sum int
 
 	for c, n := range s.Graph {
-		a := s.Positions[c]
+		a := s.Positions.At(c)
 		if n.IsRoom && a != "" && n.RoomFor != a {
 			yMove := c.Y - 1
 			xMove := util.AbsInt(c.X - a.RoomX())

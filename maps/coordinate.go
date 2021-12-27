@@ -49,6 +49,10 @@ func (c Coordinate) String() string {
 	return fmt.Sprintf("(x=%d,y=%d)", c.X, c.Y)
 }
 
+func (c Coordinate) IsZero() bool {
+	return c.X == 0 && c.Y == 00
+}
+
 type CoordinateArray struct {
 	Coordinates []Coordinate
 
