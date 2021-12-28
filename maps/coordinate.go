@@ -1,6 +1,9 @@
 package maps
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/mbark/advent-of-code-2021/util"
+)
 
 type Coordinate struct {
 	X int
@@ -51,6 +54,10 @@ func (c Coordinate) String() string {
 
 func (c Coordinate) IsZero() bool {
 	return c.X == 0 && c.Y == 00
+}
+
+func (c Coordinate) ManhattanDistance(co Coordinate) int {
+	return util.AbsInt(c.X-co.X) + util.AbsInt(c.Y-co.Y)
 }
 
 type CoordinateArray struct {

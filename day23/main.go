@@ -26,6 +26,14 @@ const (
   #########
 `
 
+	testMove = `
+#############
+#.A.........#
+###A#.#C#D###
+  #B#B#C#D#
+  #########
+`
+
 	testData2 = `
 #############
 #...........#
@@ -67,7 +75,7 @@ func main() {
 	state2 := parseInput(in2)
 
 	fmt.Printf("first: %d\n", solve(state))
-	fmt.Printf("first: %d\n", solve(state2))
+	fmt.Printf("second: %d\n", solve(state2))
 }
 
 func parseInput(in string) State {
@@ -121,29 +129,7 @@ func parseInput(in string) State {
 			forAmphipod = "D"
 		}
 
-		graph[c] = Node{
-			Coordinate:      c,
-			IsHallway:       c.Y == 1,
-			IsRoom:          c.Y > 1,
-			IsLeftCorridor:  c.X < 3,
-			IsRightCorridor: c.X > 9,
-			IsAboveRoom:     c.Y == 1 && (c.X == 3 || c.X == 5 || c.X == 7 || c.X == 9),
-			RoomFor:         forAmphipod,
-		}
-	}
-
-	for c, n := range graph {
-		var neighbors []Node
-		for _, ac := range c.Adjacent() {
-			nn, ok := graph[ac]
-			if !ok {
-				continue
-			}
-
-			neighbors = append(neighbors, nn)
-		}
-
-		n.Neighbors = neighbors
+		graph[c] = Node{Coordinate: c, RoomFor: forAmphipod}
 	}
 
 	var positions Positions
@@ -252,7 +238,7 @@ func (s State) IsDone() bool {
 	for _, a := range s.Positions {
 		for _, c := range a.Coordinates {
 			n := s.Graph[c]
-			if !n.IsRoom || n.RoomFor != a.Amphipod {
+			if !n.IsRoom() || n.RoomFor != a.Amphipod {
 				return false
 			}
 		}
@@ -266,116 +252,147 @@ func (s State) IsEmpty(c maps.Coordinate) bool {
 	return a == ""
 }
 
-func (s State) MovesFor(visited map[maps.Coordinate]struct{}, from maps.Coordinate, at maps.Coordinate, steps int, a Amphipod) []Move {
-	var moves []Move
+func (s State) IsRoomDone(at maps.Coordinate) bool {
+	node := s.Graph[at]
+	for down, ok := s.Graph[at.Down()]; ok; down, ok = s.Graph[down.Coordinate.Down()] {
+		amphiDown := s.Positions.At(down.Coordinate)
+		if amphiDown != node.RoomFor {
+			return false
+		}
+	}
 
-	// we've already been here!
-	if _, ok := visited[at]; ok {
+	return true
+}
+
+func (s State) CanMoveIntoRoom(a Amphipod) bool {
+	for down, ok := s.Graph[maps.Coordinate{Y: 2, X: a.RoomX()}]; ok; down, ok = s.Graph[down.Coordinate.Down()] {
+		amphiDown := s.Positions.At(down.Coordinate)
+		if amphiDown != "" && amphiDown != down.RoomFor {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (s State) CanMoveToHallway(at maps.Coordinate) bool {
+	for n := s.Graph[at.Up()]; n.Coordinate.Y > 1; n = s.Graph[n.Coordinate.Up()] {
+		if !s.IsEmpty(n.Coordinate) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (s State) MoveInHallway(at maps.Coordinate) []maps.Coordinate {
+	var coords []maps.Coordinate
+	leftat := at.Left()
+	for ; ; leftat = leftat.Left() {
+		n, ok := s.Graph[leftat]
+		if !ok || !s.IsEmpty(n.Coordinate) {
+			break
+		}
+
+		if n.IsLeftCorridor() || !n.IsAboveRoom() {
+			coords = append(coords, n.Coordinate)
+		}
+	}
+
+	rightat := at.Right()
+	for ; ; rightat = rightat.Right() {
+		n, ok := s.Graph[rightat]
+		if !ok || !s.IsEmpty(n.Coordinate) {
+			break
+		}
+
+		if n.IsRightCorridor() || !n.IsAboveRoom() {
+			coords = append(coords, n.Coordinate)
+		}
+	}
+
+	return coords
+}
+
+func (s State) MoveToRoom(at maps.Coordinate, a Amphipod) *maps.Coordinate {
+	// no point moving there
+	if !s.CanMoveIntoRoom(a) {
 		return nil
 	}
 
-	visited[at] = struct{}{}
-	node, exists := s.Graph[at]
-	switch {
-	case !exists:
-		// can't go where there is nowhere to go
-		return nil
-
-	case !s.IsEmpty(at):
-		// can't go here, it's already occupied
-		return nil
-
-	case node.IsRoom && node.RoomFor != a:
-		// if we're in the wrong room move to the corridor
-		return s.MovesFor(visited, from, maps.Coordinate{X: at.X, Y: 1}, steps+at.Y-1, a)
-
-	case node.IsRoom && node.RoomFor == a:
-		roomDone := true
-		for down, ok := s.Graph[at.Down()]; ok; down, ok = s.Graph[down.Coordinate.Down()] {
-			amphiDown := s.Positions.At(down.Coordinate)
-			if amphiDown != node.RoomFor {
-				roomDone = false
-				break
-			}
-		}
-
-		if roomDone {
-			return []Move{NewMove(from, at, steps, a)}
-		}
-
-		moveDown := s.MovesFor(visited, from, at.Down(), steps+1, a)
-		if moveDown != nil {
-			return moveDown
-		}
-
-		return s.MovesFor(visited, from, at.Up(), steps+1, a)
-
-	case node.IsHallway:
-		down := s.Graph[at.Down()]
-		if node.IsAboveRoom && down.RoomFor == a {
-			// check if we can move into our room
-			moveDown := s.MovesFor(visited, from, down.Coordinate, steps+1, a)
-			if moveDown != nil {
-				return moveDown
-			}
-		}
-
-		started := s.Graph[from]
-		if !node.IsAboveRoom && !started.IsHallway {
-			moves = append(moves, NewMove(from, at, steps, a))
-		}
-
-		moves = append(moves, s.MovesFor(visited, from, at.Left(), steps+1, a)...)
-		moves = append(moves, s.MovesFor(visited, from, at.Right(), steps+1, a)...)
+	// assume we start in the hallway somewhere
+	delta := 1
+	if at.X > a.RoomX() {
+		delta = -1
 	}
 
-	return moves
+	x := at.X + delta
+	for ; x != a.RoomX(); x += delta {
+		if !s.IsEmpty(maps.Coordinate{Y: at.Y, X: x}) {
+			return nil
+		}
+	}
+
+	y := at.Y
+	for ; ; y++ {
+		_, ok := s.Graph[maps.Coordinate{Y: y, X: x}]
+		if !ok || !s.IsEmpty(maps.Coordinate{Y: y, X: x}) {
+			y -= 1
+			break
+		}
+	}
+
+	return &maps.Coordinate{X: x, Y: y}
 }
 
 func (s State) MoveFrom(at maps.Coordinate, a Amphipod) []Move {
-	var moves []Move
-
 	node := s.Graph[at]
-	visited := make(map[maps.Coordinate]struct{})
-	visited[at] = struct{}{}
-
 	switch {
-	case node.IsRoom && node.RoomFor != a:
-		// if we're in the wrong room just move upwards
-		return s.MovesFor(visited, at, at.Up(), 1, a)
-
-	case node.IsRoom && node.RoomFor == a:
-		down := s.Graph[at.Down()]
-		amphiDown := s.Positions.At(down.Coordinate)
-
-		switch {
-		case amphiDown != down.RoomFor:
-			// we're in the right room but the wrong amphipod is below, we need to move up
-			return s.MovesFor(visited, at, at.Up(), 1, a)
-
-		default:
+	case node.IsRoom() && node.RoomFor != a:
+		if !s.CanMoveToHallway(at) {
 			return nil
 		}
 
-	case node.IsHallway:
-		switch {
-		case node.IsLeftCorridor:
-			// we can only move right from the left corridor
-			return s.MovesFor(visited, at, at.Right(), 1, a)
+		aboveRoom := maps.Coordinate{X: at.X, Y: 1}
+		steps := aboveRoom.ManhattanDistance(at)
 
-		case node.IsRightCorridor:
-			// we can only move left from the right corridor
-			return s.MovesFor(visited, at, at.Left(), 1, a)
+		hallwayStops := s.MoveInHallway(aboveRoom)
+		var moves []Move
+		for _, c := range hallwayStops {
+			moves = append(moves, NewMove(at, c, steps+c.ManhattanDistance(aboveRoom), a))
+		}
+		if c := s.MoveToRoom(aboveRoom, a); c != nil {
+			moves = append(moves, NewMove(at, *c, steps+c.ManhattanDistance(aboveRoom), a))
+		}
 
-		case at.X > a.RoomX():
-			return s.MovesFor(visited, at, at.Left(), 1, a)
+		return moves
 
-		case at.X < a.RoomX():
-			return s.MovesFor(visited, at, at.Right(), 1, a)
+	case node.IsRoom() && node.RoomFor == a:
+		if s.IsRoomDone(at) {
+			return nil
+		}
+
+		if !s.CanMoveToHallway(at) {
+			return nil
+		}
+
+		aboveRoom := maps.Coordinate{X: at.X, Y: 1}
+		steps := aboveRoom.ManhattanDistance(at)
+
+		hallwayStops := s.MoveInHallway(aboveRoom)
+		var moves []Move
+		for _, c := range hallwayStops {
+			moves = append(moves, NewMove(at, c, steps+c.ManhattanDistance(aboveRoom), a))
+		}
+		return moves
+
+	case node.IsHallway():
+		if c := s.MoveToRoom(at, a); c != nil {
+			return []Move{NewMove(at, *c, c.ManhattanDistance(at), a)}
 		}
 	}
 
-	return moves
+	return nil
 }
 
 func (a Amphipod) MoveCost(steps int) int {
@@ -413,7 +430,7 @@ func (s State) Moves() []Move {
 func EndState(g Graph) State {
 	pos := make(map[Amphipod][]maps.Coordinate)
 	for c, n := range g {
-		if n.IsRoom {
+		if n.IsRoom() {
 			pos[n.RoomFor] = append(pos[n.RoomFor], c)
 		}
 	}
@@ -489,18 +506,18 @@ func (s State) Heuristic() int {
 
 	for c, n := range s.Graph {
 		a := s.Positions.At(c)
-		if n.IsRoom && a != "" && n.RoomFor != a {
+		if n.IsRoom() && a != "" && n.RoomFor != a {
 			yMove := c.Y - 1
 			xMove := util.AbsInt(c.X - a.RoomX())
 			sum += (yMove + xMove) * a.Cost()
 		}
 
-		if n.IsHallway && a != "" {
+		if n.IsHallway() && a != "" {
 			xMove := util.AbsInt(c.X - a.RoomX())
 			sum += xMove * a.Cost()
 		}
 
-		if n.IsRoom && a == "" {
+		if n.IsRoom() && a == "" {
 			sum += (c.Y - 1) * n.RoomFor.Cost()
 		}
 	}
@@ -510,14 +527,31 @@ func (s State) Heuristic() int {
 
 type Node struct {
 	Coordinate maps.Coordinate
-	Neighbors  []Node
+	RoomFor    Amphipod
+}
 
-	IsHallway       bool
-	IsLeftCorridor  bool // the corridor is the room to the left or right of the rooms
-	IsRightCorridor bool // the corridor is the room to the left or right of the rooms
-	IsAboveRoom     bool
-	IsRoom          bool
-	RoomFor         Amphipod
+func (n Node) IsHallway() bool {
+	return n.Coordinate.Y == 1
+}
+
+func (n Node) IsLeftCorridor() bool {
+	c := n.Coordinate
+	return c.Y == 1 && c.X < 3
+}
+
+func (n Node) IsRightCorridor() bool {
+	c := n.Coordinate
+	return c.X > 9 && c.X < 3
+}
+
+func (n Node) IsRoom() bool {
+	c := n.Coordinate
+	return c.Y > 1 && (c.X == 3 || c.X == 5 || c.X == 7 || c.X == 9)
+}
+
+func (n Node) IsAboveRoom() bool {
+	c := n.Coordinate
+	return c.Y == 1 && (c.X == 3 || c.X == 5 || c.X == 7 || c.X == 9)
 }
 
 type Amphipod string
