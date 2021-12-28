@@ -145,6 +145,7 @@ func parseInput(in string) State {
 
 type State struct {
 	Positions Positions
+	Hash      uint32
 	Graph     Graph
 }
 
@@ -221,8 +222,8 @@ func init() {
 	}
 }
 
-// Hash calculates a Zobrist hash
-func (s State) Hash() uint32 {
+// InitiateHash calculates a Zobrist hash
+func (s *State) InitiateHash() {
 	var h uint32
 	for _, a := range s.Positions {
 		j := amphipodIndex[a.Amphipod]
@@ -230,6 +231,19 @@ func (s State) Hash() uint32 {
 			h = h ^ bitstrings[13*c.Y+c.X][j]
 		}
 	}
+
+	s.Hash = h
+}
+
+func (s State) UpdateHash(move Move, a Amphipod) uint32 {
+	j := amphipodIndex[a]
+
+	h := s.Hash
+	fc, tc := move.From, move.To
+	// remove old position
+	h = h ^ bitstrings[13*fc.Y+fc.X][j]
+	// add new position
+	h = h ^ bitstrings[13*tc.Y+tc.X][j]
 
 	return h
 }
@@ -473,6 +487,7 @@ func NewMove(from maps.Coordinate, to maps.Coordinate, steps int, a Amphipod) Mo
 }
 
 func (m Move) Do(s State) State {
+	var movedAmphipod Amphipod
 	news := make(Positions, len(s.Positions))
 	for i, a := range s.Positions {
 		var moved bool
@@ -484,6 +499,7 @@ func (m Move) Do(s State) State {
 		}
 
 		if moved {
+			movedAmphipod = a.Amphipod
 			coordinates := make([]maps.Coordinate, len(a.Coordinates))
 			for i, c := range a.Coordinates {
 				if c == m.From {
@@ -498,12 +514,20 @@ func (m Move) Do(s State) State {
 		}
 	}
 
-	return State{Positions: news, Graph: s.Graph}
+	return State{
+		Positions: news,
+		Graph:     s.Graph,
+		Hash:      s.UpdateHash(m, movedAmphipod),
+	}
 }
 
-func (s State) Heuristic() int {
-	var sum int
+func (s State) Heuristic(m Move) int {
+	// moving someone into their room is always the right move from any given state
+	if m.To.Y > 1 {
+		return -m.Cost
+	}
 
+	var sum int
 	for c, n := range s.Graph {
 		a := s.Positions.At(c)
 		if n.IsRoom() && a != "" && n.RoomFor != a {
@@ -566,6 +590,9 @@ func djikstra(start State, end State, graph Graph) int {
 	f := util.WithTime()
 	defer f()
 
+	start.InitiateHash()
+	end.InitiateHash()
+
 	cost := make(map[uint32]int)
 	prev := make(map[uint32]State)
 
@@ -581,29 +608,27 @@ func djikstra(start State, end State, graph Graph) int {
 
 		for _, move := range n.State.Moves() {
 			nextState := move.Do(n.State)
-			hash := nextState.Hash()
 
-			newCost := cost[n.State.Hash()] + move.Cost
-			currCost, ok := cost[hash]
+			newCost := cost[n.State.Hash] + move.Cost
+			currCost, ok := cost[nextState.Hash]
 			if !ok || newCost < currCost {
-				prev[hash] = n.State
-				cost[hash] = newCost
-				heap.Push(&pq, &Item{State: nextState, Priority: newCost + nextState.Heuristic()})
+				prev[nextState.Hash] = n.State
+				cost[nextState.Hash] = newCost
+
+				heap.Push(&pq, &Item{State: nextState, Priority: newCost + nextState.Heuristic(move)})
 			}
 		}
 	}
 
-	p := EndState(graph)
+	p := end
 	path := []State{p}
-	for p.Hash() != start.Hash() {
+	for p.Hash != start.Hash {
 		if len(p.Positions) == 0 {
 			panic("no way back!")
 		}
 
 		path = append(path, p)
-		hash := p.Hash()
-		pr := prev[hash]
-		p = pr
+		p = prev[p.Hash]
 	}
 	path = append(path, p)
 
@@ -611,7 +636,7 @@ func djikstra(start State, end State, graph Graph) int {
 		path[i], path[j] = path[j], path[i]
 	}
 
-	return cost[end.Hash()]
+	return cost[end.Hash]
 }
 
 type Item struct {
